@@ -7,7 +7,7 @@ const PORT = 3000;
 
 // IMPORTANT: Replace 'your-api-key-here' with your actual OpenAI API key
 const openai = new OpenAI({
-   apiKey: process.env.OPENAI_API_KEY || 'your-api-key-here'
+   apiKey: process.env.OPENAI_API_KEY || 'your-api-key-here' 
 });
 
 app.use(cors());
