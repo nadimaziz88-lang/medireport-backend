@@ -3,11 +3,11 @@ const cors = require('cors');
 const OpenAI = require('openai');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = 3000;
 
 // IMPORTANT: Replace 'your-api-key-here' with your actual OpenAI API key
 const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY || 'your-api-key-here'
+    apiKey: 'your-api-key-here' // PUT YOUR API KEY HERE
 });
 
 app.use(cors());
@@ -31,7 +31,77 @@ app.post('/analyze', async (req, res) => {
 
         console.log('Analyzing report... (text length:', reportText.length, 'characters)');
 
-        // Call OpenAI API with detailed medical analysis prompt
+        // STEP 1: First, validate if this is actually a medical report
+        console.log('Step 1: Validating if document is a medical report...');
+        const validationCompletion = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+                {
+                    role: "system",
+                    content: `You are a medical document validator. Your job is to determine if a document is a legitimate medical report, test result, prescription, or health-related document.
+
+Respond with ONLY a JSON object in this format:
+{
+  "isMedical": true/false,
+  "documentType": "medical report" or "not medical",
+  "reason": "brief explanation"
+}
+
+A document is medical if it contains:
+- Lab test results (blood tests, urine tests, etc.)
+- Medical imaging reports (X-rays, MRI, CT scans, ultrasound)
+- Doctor's notes or prescriptions
+- Hospital discharge summaries
+- Health checkup reports
+- Any legitimate medical or health-related information
+
+A document is NOT medical if it's:
+- Receipts, invoices, bills (unless they're prescriptions)
+- Random text, stories, essays
+- Non-medical documents (contracts, letters, etc.)
+- Gibberish or unreadable text
+- Empty or very short text`
+                },
+                {
+                    role: "user",
+                    content: `Is this a medical document? Analyze the text below and respond with ONLY the JSON format specified.
+
+Text to analyze:
+${reportText.substring(0, 2000)}`
+                }
+            ],
+            temperature: 0.1,
+            max_tokens: 200
+        });
+
+        let validationResult;
+        try {
+            let validationResponse = validationCompletion.choices[0].message.content.trim();
+            if (validationResponse.startsWith('```json')) {
+                validationResponse = validationResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+            }
+            validationResult = JSON.parse(validationResponse);
+            console.log('Validation result:', validationResult);
+        } catch (parseError) {
+            console.error('Validation parse error:', parseError);
+            // If validation fails, assume it might be medical and continue
+            validationResult = { isMedical: true, documentType: "unknown", reason: "Could not validate" };
+        }
+
+        // If not medical, return error immediately
+        if (!validationResult.isMedical) {
+            console.log('Document is not medical. Rejecting analysis.');
+            return res.status(400).json({
+                success: false,
+                error: 'NOT_MEDICAL_REPORT',
+                message: 'This does not appear to be a medical report or health document.',
+                details: validationResult.reason || 'The uploaded document does not contain medical test results, health records, or clinical information.',
+                suggestion: 'Please upload a valid medical report such as: blood test results, X-ray/MRI reports, prescriptions, or other medical documents.'
+            });
+        }
+
+        // STEP 2: If it's medical, proceed with full analysis
+        console.log('Document validated as medical. Proceeding with analysis...');
         const completion = await openai.chat.completions.create({
             model: "gpt-4o-mini", // Cost-effective model
             messages: [
@@ -146,7 +216,7 @@ Remember: Respond ONLY with valid JSON. Extract actual findings from the report 
     }
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, () => {
     console.log(`\n✅ MediReport AI Backend running!`);
     console.log(`🌐 Server: http://localhost:${PORT}`);
     console.log(`\n⚠️  IMPORTANT: Add your OpenAI API key in server.js\n`);
