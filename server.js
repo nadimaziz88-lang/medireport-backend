@@ -7,7 +7,7 @@ const PORT = 3000;
 
 // IMPORTANT: Replace 'your-api-key-here' with your actual OpenAI API key
 const openai = new OpenAI({
-    apiKey: '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' // PUT YOUR API KEY HERE
+   apiKey: process.env.OPENAI_API_KEY || 'your-api-key-here'
 });
 
 app.use(cors());
