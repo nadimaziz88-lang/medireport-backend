@@ -29,12 +29,6 @@ app.post('/analyze', async (req, res) => {
             });
         }
 
-        console.log('Validation result:', {
-             isMedical: validationResult.isMedical,
-             documentType: validationResult.documentType,
-             reason: validationResult.reason
-         });
-
         // STEP 1: First, validate if this is actually a medical report
         console.log('Step 1: Validating if document is a medical report...');
         const validationCompletion = await openai.chat.completions.create({
