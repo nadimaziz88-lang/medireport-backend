@@ -29,7 +29,11 @@ app.post('/analyze', async (req, res) => {
             });
         }
 
-        console.log('Analyzing report... (text length:', reportText.length, 'characters)');
+        console.log('Validation result:', {
+             isMedical: validationResult.isMedical,
+             documentType: validationResult.documentType,
+             reason: validationResult.reason
+         });
 
         // STEP 1: First, validate if this is actually a medical report
         console.log('Step 1: Validating if document is a medical report...');
@@ -91,6 +95,7 @@ ${reportText.substring(0, 2000)}`
         // If not medical, return error immediately
         if (!validationResult.isMedical) {
             console.log('Document is not medical. Rejecting analysis.');
+            console.log('=== ANALYSIS REJECTED ===\n');
             return res.status(400).json({
                 success: false,
                 error: 'NOT_MEDICAL_REPORT',
@@ -101,7 +106,7 @@ ${reportText.substring(0, 2000)}`
         }
 
         // STEP 2: If it's medical, proceed with full analysis
-        console.log('Document validated as medical. Proceeding with analysis...');
+        console.log('✓ Document validated as medical. Proceeding with full analysis...');
         const completion = await openai.chat.completions.create({
             model: "gpt-4o-mini", // Cost-effective model
             messages: [
@@ -192,7 +197,11 @@ Remember: Respond ONLY with valid JSON. Extract actual findings from the report 
             }
             
             analysis = JSON.parse(cleanResponse);
-            console.log('Analysis parsed successfully');
+            console.log('✓ Analysis completed successfully');
+            console.log('Tokens used:', completion.usage.total_tokens);
+            console.log('Report type:', analysis.reportType);
+            console.log('Confidence:', analysis.confidence);
+            console.log('=== ANALYSIS COMPLETE ===\n');
         } catch (parseError) {
             console.error('JSON Parse Error:', parseError);
             return res.status(500).json({ 
